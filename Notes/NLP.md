@@ -98,6 +98,10 @@ Referece: https://www.youtube.com/watch?v=quoGRI-1l0A&list=PLiWO7LJsDCHcpUmL9grX
 ## Transformer Architecture and Applications
 
 ![Transformer](./imgs/transformer.png)
+![Transformer 1](./imgs/transformer1.png)
+![Transformer 2](./imgs/transformer2.png)
+![Transformer 3](./imgs/transformer3.png)
+![Transformer 4](./imgs/transformer4.png)
 
 * Architecture highlights: 
   * Position encoded input vectores
@@ -860,7 +864,44 @@ $$
 ***
 
 
+## Textual generative AI models are transformers
+
+* Main advantages:
+  * Attention mechanism - encodes data context, “understand” the relationship between far sequential elements.
+  * Process all the words in the sequence in parallel, thus greatly speeding up computation.
+  * The distance between words in the input sequence does not matter - equally good at computing
+  * dependencies between adjacent words and words that are far apart.
+  * More accurate on various tasks.
+
+* As models get larger and larger: 
+
+  * Full fine-tuning becomes infeasible to train on consumer hardware. 
+  * Storing and deploying fine-tuned models (checkpoints) independently for each downstream task becomes
+  * very expensive, because fine-tuned models are the same size as the original pretrained model.
+
+* Catastrophic forgetting 
+  * When trained on one task, then trained on a second task, many machine learning models "forget" how to perform the first task.
+
 ## Refenence: 
 
 * https://github.com/jamescalam/transformers
 * https://github.com/fastai/course-nlp.git
+* HuggingFace blog on PEFT: https://huggingface.co/blog/peft 
+* HuggingFace 🤗 PEFT library: https://github.com/huggingface/peft 
+* AdapterHub - Adapter-Transformers v3 - Unifying Efficient Fine-Tuning 
+* Paper: LoRA: Low-Rank Adaptation of Large Language Models
+* HuggingFace Course: https://huggingface.co/course/chapter1/1  
+* Illustrated transformers: https://jalammar.github.io/illustrated-transformer/ 
+* Transformers (short) intro: https://www.youtube.com/watch?v=TQQlZhbC5ps 
+* Big Science: https://bigscience.huggingface.co/ 
+* https://huggingface.co/tasks
+* https://github.com/huggingface/transformers/tree/main/examples
+
+### Hugging face PEFT library
+
+* LoRA: LORA: LOW-RANK ADAPTATION OF LARGE LANGUAGE MODELS
+* Prefix Tuning: P-Tuning v2: Prompt Tuning Can Be Comparable to Fine-tuning Universally Across Scales and Tasks
+* Prompt Tuning: The Power of Scale for Parameter-Efficient Prompt Tuning
+* P-Tuning: GPT Understands, Too
+
+
