@@ -24,9 +24,15 @@
 
 * RNN (Naive)
   * The architure is a natural fit for language modeling
+    * seq to seq (many in many out)
+    * seq to vector (many to one)
+    * vector to seq (one to many)
   * Major issue is Vanish/Exploding Gradient problem
     * Vanishing: if error of network is too small, it propergate and becomes much small for the network to learn
     * Exploding: if weight is too large, it will grow exponentially, the network will oscillate without learning
+    * ReLU and variation of ReLU can help to reduce vanishing gradient because it does not exponentially decrease the rate of change as sigmoid
+    * Batch norm is another way to alleviate vanishing gradients
+    * Better initialization
 
 *** 
 
@@ -41,6 +47,23 @@
   * output gate: determine the next hidden state (sigmoid x tanh(cell state))
   * Summary: the forget gate decides what is relevant to keep from prior steps. The input gate decides what information is relevant to add from the current cell state. The output gate determines what the next hidden state should be.
     * Note: Sigmoid $\in [0, 1]$ can remove information, tanh $\in [-1, 1]$ can change polarity of the information
+* LSTM math form
+For each element in the input sequence, an LSTM layer computes the following functions:<br>
+$\begin{array}{ll} \\
+    i_t = \sigma(W_{ii} x_t + b_{ii} + W_{hi} h_{(t-1)} + b_{hi}) \\
+    f_t = \sigma(W_{if} x_t + b_{if} + W_{hf} h_{(t-1)} + b_{hf}) \\
+    g_t = \tanh(W_{ig} x_t + b_{ig} + W_{hg} h_{(t-1)} + b_{hg}) \\
+    o_t = \sigma(W_{io} x_t + b_{io} + W_{ho} h_{(t-1)} + b_{ho}) \\
+    c_t = f_t * c_{(t-1)} + i_t * g_t \\
+    h_t = o_t * \tanh(c_t) \\
+\end{array}$
+
+  where $h_t$ is the hidden state at time $t$, <br>
+  $c_t$ is the cell state at time $t$, <br>
+  $x_t$ is the input at time $t$, <br>
+  $h_{(t-1)}$ is the hidden state of the layer at time $t-1$ or the initial hidden state at time $0$, and <br>
+  $i_t, f_t, g_t, o_t$ are the input, forget, cell, and output gates, respectively.<br>
+  $\sigma$ is the sigmoid function, and $*$ is the Hadamard product.
 * LSTM improves upon naive RNN with more stable passage of information (reduce vanish/exploding graduent)
   
   ***
