@@ -25,7 +25,7 @@ $$\text{Convert to angular distance: }\theta = \arccos \frac{\overrightarrow{w}_
 * Unsurpervised learning: word representation should predict their context and vice versa
   * **Hypothesis**: let’s try to learn meaning of words (as vector representation), by predicting the words around them.
   * **Skip-gram**: Train representations to predict context around a word
-    * Predict context around a word $P(context | word)
+    * Predict context around a word $P(context | word)$
     * Randomly samples X words from context window
     * Maximizes $P(context_{i\in{X}}|word_i)$
   * **CBOW**: Continuous Bag-of-Words train representation to predict word from surrounding context. 
