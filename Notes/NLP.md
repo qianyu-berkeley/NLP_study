@@ -65,7 +65,7 @@ $\begin{array}{ll} \\
   $i_t, f_t, g_t, o_t$ are the input, forget, cell, and output gates, respectively.<br>
   $\sigma$ is the sigmoid function, and $*$ is the Hadamard product.
 * LSTM improves upon naive RNN with more stable passage of information (reduce vanish/exploding graduent)
-  
+  * Total params in general should be in the same magnitude of words or chars depending on the approach
   ***
 
 ## Encoder-decoder Attention network with LSTM
@@ -905,8 +905,61 @@ $$
 * Catastrophic forgetting 
   * When trained on one task, then trained on a second task, many machine learning models "forget" how to perform the first task.
 
-## Refenence: 
+***
+# Secion 9. PEFT: Parameter-Efficient Fine-Tuning of Billion-Scale Models on Low-Resource Hardware
+***
 
+* [Ref](https://huggingface.co/blog/peft)
+* [HuggingFace Library](https://github.com/huggingface/peft)
+* [Example Notebook](https://github.com/huggingface/peft/blob/main/examples/conditional_generation/peft_lora_seq2seq.ipynb)
+
+## Challenge
+
+* As models get larger and larger, full fine-tuning becomes infeasible to train on consumer hardware. 
+* In addition, storing and deploying fine-tuned models independently for each downstream task becomes very expensive, because fine-tuned models are the same size as the original pretrained model
+* users can tune models using PEFT methods to get tiny checkpoints worth a few MBs compared to the large checkpoints of full fine-tuning
+
+
+
+## Why PEFT
+
+* PEFT approaches only fine-tune a small number of (extra) model parameters while freezing most parameters of the pretrained LLMs, thereby greatly decreasing the computational and storage costs
+* overcomes the issues of catastrophic forgetting, a behaviour observed during the full finetuning of LLMs. PEFT approaches have also shown to be better than fine-tuning in the low-data regimes and generalize better to out-of-domain scenarios
+* The small trained weights from PEFT approaches are added on top of the pretrained LLM. So the same LLM can be used for multiple tasks by adding small weights without having to replace the entire model.
+
+## Hugging face PEFT library (Supports)
+* LoRA: LORA: LOW-RANK ADAPTATION OF LARGE LANGUAGE MODELS
+* Prefix Tuning: P-Tuning v2: Prompt Tuning Can Be Comparable to Fine-tuning Universally Across Scales and Tasks
+* Prompt Tuning: The Power of Scale for Parameter-Efficient Prompt Tuning
+* P-Tuning: GPT Understands, Too
+
+
+***
+# openAI API
+***
+
+## GPT4
+
+* Not just a language model but also a vision model
+* Provide a structured input (system and user)
+* Combine idea from differet artiles
+
+```
+# System example:
+You are an AI programming assistant.
+
+- following the user's requirement carefully and to the letter
+- First think step-by-step, describe your plan for what to build in pseudocode, written out in great detail
+- Then output the code in a single code block
+- minimize any other prose
+```
+  
+
+***
+# Refenence: 
+***
+
+## General
 * https://github.com/jamescalam/transformers
 * https://github.com/fastai/course-nlp.git
 * HuggingFace blog on PEFT: https://huggingface.co/blog/peft 
@@ -920,11 +973,10 @@ $$
 * https://huggingface.co/tasks
 * https://github.com/huggingface/transformers/tree/main/examples
 
-### Hugging face PEFT library
+## [Building with Instruction-Tuned LLMs: A Step-by-Step Guide](https://www.youtube.com/watch?v=eTieetk2dSw&ab_channel=DeepLearningAI)
 
-* LoRA: LORA: LOW-RANK ADAPTATION OF LARGE LANGUAGE MODELS
-* Prefix Tuning: P-Tuning v2: Prompt Tuning Can Be Comparable to Fine-tuning Universally Across Scales and Tasks
-* Prompt Tuning: The Power of Scale for Parameter-Efficient Prompt Tuning
-* P-Tuning: GPT Understands, Too
+- Building with Instruct-Tuned LLMs, a Step-by-Step Guide: https://github.com/FourthBrain/Building-with-Instruction-Tuned-LLMs-A-Step-by-Step-Guide
+- Supervised Fine-Tuning (Instruct-Tuning) of OpenLLAMA with Dolly15k & QLORA: https://colab.research.google.com/drive/1SRclU2pcgzCkVXpmhKppVbGW4UcCs5xT?usp=sharing
+- Unsupervised Fine-Tuning (1-O Schema) of BLOOMZ with PEFT-LORA: https://colab.research.google.com/drive/1ARmlaZZaKyAg6HTi57psFLPeh0hDRcPX?usp=sharing
 
 
