@@ -11,18 +11,35 @@
 
 * NLP Started with `word2vec` by Mikolov et al (https://arxiv.org/abs/1301.3781)
   * Typical vector dimension is 50 - 100
-  * Method 1: CBOW (Continous bag of words): given the surrounding words context we predict the current words
-  * Method 2: SKIP-gram: given the words we predict the surrounding words context
+  * Method 1: `CBOW` (Continous bag of words): given the surrounding words context we predict the current words
+  * Method 2: `SKIP-gram`: given the words we predict the surrounding words context
   * Applications:
     * Word similarity in the vector space
-    * Doc2vec as a variation
     * Document classification
+  * `Doc2vec` as a variation
+    * Uses the word2vec model, and added another vector (Paragraph ID)
+    * two flavors:
+      * `Distributed Memory version of Paragraph Vector` (PV-DM). It acts as a memory that remembers what is missing from the current context — or as the topic of the paragraph. While the word vectors represent the concept of a word, the document vector intends to represent the concept of a document.
+      * similar to skip-gram may be used Distributed Bag of Words version of Paragraph Vector (PV-DBOW)
+* Challenges: no direct way of evaluate the model since it is an unsupervised learning
+  * One possible metric for word2vec, is a generalization of the above example, and is called analogical reasoning.
+  
+    ```
+    happy happily — furious furiously
+    immediate immediately — infrequent infrequently
+    slowing slowed — sleeping slept
+    spending spent — striking struck
+    ```
+    [Ref Dataset for analogical reasoning](http://download.tensorflow.org/data/questions-words.txt)
+  
+  * A success in this task is getting very close results when caclulating distances (cosine) between matching pairs.
+  * Doc2vec was tested in the article on 2 tasks: the first is sentiment analysis, and the second one is similar to the analogical reasoning
 
 *** 
 
 ## RNN
 
-* RNN (Naive)
+* RNN
   * The architure is a natural fit for language modeling
     * seq to seq (many in many out)
     * seq to vector (many to one)
@@ -72,24 +89,25 @@ $\begin{array}{ll} \\
 
 Referece: https://www.youtube.com/watch?v=quoGRI-1l0A&list=PLiWO7LJsDCHcpUmL9grX9WLjyi-e92iCO&index=12&ab_channel=DeepLearningAI
 
-![LSTM attention Diagram](./imgs/lstm_attention.png)
+<img src="./imgs/lstm_attention.png" width=500, height=250>
 
 * The precursor of transformer archecture
 * The atention mechanism is inspired from laugnuage translation problem 
 * Architecture: encoder-decoder network expands LSTM network with addition hidden state, and NN layers
   * Allowed the output layers of a model to not only receive the final-state of the RNN units — but to also receive information from every state of the input layer, creating an ‘attention’ mechanism.
-  * With this approach we find that similarity between the encoder and decoder states will result in a higher weight 
+  * With this approach we find that similarity between the encoder and decoder states will result in a higher weight
 
-![attention example Diagram](./imgs/attention_example.png)
+<img src="./imgs/attention_example.png" width=500 height=300>
 
-* To train attention network: 
+* To train encoder self-attention network: 
   * Use three tensors, the Query, Key, and Value are used in the attention operation. The Query is pulled from the hidden state of the decoder at every time-step — alignment between this and the Key-Value tensors is assessed to produce the context vector.
   * The context vector is the sum output of attention network before feeding to the output layer
   * The context vector is then passed back into the decoder where is used to produce a prediction for that time-step. This process is repeated for every time-step in the decoder space
   * If this is a translation problem. Input is the sentence to be translated, output is translated sentence. Weights of the attention network is the hotspot on the headmap above
 
-![context vector Diagram](./imgs/context_vector_lstm.png)
-![encoder decoder lstm](./imgs/encoder-decoder.png)
+<img src="./imgs/context_vector_lstm.png" width=50% height=50%>
+
+<img src="imgs/encoder-decoder.png">
 
 ***
 
@@ -102,7 +120,7 @@ Referece: https://www.youtube.com/watch?v=quoGRI-1l0A&list=PLiWO7LJsDCHcpUmL9grX
   * **Self-attention**: attention within a sentence, it allows us to remove Query (from decoder) so that it can generated directly from input value (encoder), creates better allignment different part of input sequence since Q, K, V are all produced from inputs, produces much more meaningful numerical vectors. It allows the attention mechanism to encode relationships between all of the words in the input data.
   * **Multi-head attention**: multiple attention heads, create multiple representation of attention encoding: multiple self-attention in parallel. The outputs of these multiple heads are concatenated together. The parallel mechanism allowed the model to represent several subspaces of the same sequence. These different levels of attention were then concatenated and processed by a linear unit.
 
-  ![Multi-headed Attention](./imgs/multi-headed_attention.png)
+  <img src="./imgs/multi-headed_attention.png" width=50% height=50%>
 
   * **Positional encoding**: input the attention network is no longer sequential (as RNN or LSTM network), it is in parallel, therefore we need additional encoding to show the position of the words, but we want to make sure it does not overweight the sematic position in the vector space. The approach:
     * position encoding is added to word embedding
@@ -116,25 +134,31 @@ Referece: https://www.youtube.com/watch?v=quoGRI-1l0A&list=PLiWO7LJsDCHcpUmL9grX
     * This encoding then added the word embedding
     * Note:  both the word embedding dimensionality and positional encoding dimensionality must match.
 
+* Transformer language model uses only decoder (e.g. GPT3, GPT2), other transformer based tasks use encoder or both (e.g. BERT)
+* [Reference Deep-dive](https://jalammar.github.io/illustrated-transformer/)
+
 ***
 
 ## Transformer Architecture and Applications
 
-![Transformer](./imgs/transformer.png)
-![Transformer 1](./imgs/transformer1.png)
-![Transformer 2](./imgs/transformer2.png)
-![Transformer 3](./imgs/transformer3.png)
-![Transformer 4](./imgs/transformer4.png)
+<img src="./imgs/transformer1.png" width=70% height=50%>
+<img src="./imgs/transformer2.png" width=70% height=50%>
+<img src="./imgs/transformer3.png" width=70% height=50%>
+<img src="./imgs/transformer4.png" width=70% height=50%>
 
-* Architecture highlights: 
+* Architecture highlights:
   * Position encoded input vectores
   * mutli-head attention network
   * encoder / decoder
+    * Encoder contains self-attention + feed-forward network
+    * Decoder contains self-attention + encoder-decoder-attention + feed-forward network
   * Additional NN
   * Optional self-attention network (where decoder is no longer needed)
 * Transformer based modules (such as BERT), we can customize by adding other layers around BERT to fit our tasks
   * MLM (Masked Language Modeling)
-  ![BERT_mlm](./imgs/bert_mlm.png)
+
+  <img src="./imgs/bert_mlm.png" width=50% height=50%>
+
     * Text will be fet in with a set of masked tokens for BERT to guess
     * Use for training language model to predict the probability of each words
     * text with masked token => Bert => Linear layer (alignment calculation) + softmax => Argmax
@@ -142,7 +166,9 @@ Referece: https://www.youtube.com/watch?v=quoGRI-1l0A&list=PLiWO7LJsDCHcpUmL9grX
     * Similar to MLM, difference is in the output layer where instead of predict the probabilies of the words, we predict classes
     * text => Bert => Linear layer (alignment calculation) + softmax => classes
   * QA (Question and Answer)
-  ![qa_linear_bert](./imgs/qa_linear_bert.png)
+
+  <img src="./imgs/qa_linear_bert.png" width=50% height=50%>
+
     * Feed a questions along with a context which contains the answer, output a start token and end token that marks the position of the answer in the context
     * questions + conext => bert => 2 parallel linear layer(alignment calculation) + softmax => argmax-start-token, argmax-end-token
 
@@ -373,8 +399,7 @@ LDA
 
 NMF
 
-* Calculates how well each document fits each topic, rather than assuming a
-* document has multiple topics.
+* Calculates how well each document fits each topic, rather than assuming a document has multiple topics.
 * Usually faster than LDA.
 * Works best with shorter texts such as tweets or titles.
 * Results are deterministic (I think), having more consistency when running the same data.
@@ -390,7 +415,8 @@ NMF
   * self-attention
   * Bidirectional attention
   * Multi-head attention
-  ![Attention overview](./imgs/attention_overview.png)
+
+  <img src="./imgs/attention_overview.png" width=50% height=50%>
  
 ### Dot-product attention (encoder-decoder)
 
@@ -400,7 +426,7 @@ Because of this, we would expect sentences with similar meaning to have a simila
 
 Now, when we iterate through each word, and compare the individual vectors between the two sequences - we should find that words such as *"Hello"* and *"Ciao"* have higher similarity than words that have different meaning such as *"are"* and *"Ciao"*.
 
-  ![Dot product attention](./imgs/dotprod_attention.png)
+  <img src="./imgs/dotprod_attention.png" width=50% height=40%>
 
 * Steps: 
   * Convert a word into word2vec
@@ -449,7 +475,7 @@ Now, when we iterate through each word, and compare the individual vectors betwe
 * This is particularly useful for masked language modeling - and is used in BERT (Bidirectional Encoder Representations from Transformers) - bidirectional self-attention refers to the bidirectional encoder, or the BE of BERT.
   ![bidirectional attention](./imgs/bidirectional_attention.png)
 
-### Multihead Attention (Actuall used in BERT)
+### Multihead Attention (used in BERT)
 
 * build several representations of bidirectional attention between words - so rather than calculating attention once, we calculate it several times, concatenate the results, and pass them through a linear layer. In a transformer model
   * Same input but mulitple heads
@@ -458,6 +484,8 @@ Now, when we iterate through each word, and compare the individual vectors betwe
   * Add an additional linear layer ($w_0$) to convert back to the right dimension
 
   ![multi-head attention](./imgs/multihead_attention.png)
+
+* The self attention layers in the decoder operate in a slightly different way than the one in the encoder: In the decoder, the self-attention layer is only allowed to attend to earlier positions in the output sequence. This is done by masking future positions (setting them to -inf) before the softmax step in the self-attention calculation.
 
 ***
 # Section 4. Language Classification Tasks
@@ -928,14 +956,20 @@ $$
 * The small trained weights from PEFT approaches are added on top of the pretrained LLM. So the same LLM can be used for multiple tasks by adding small weights without having to replace the entire model.
 
 ## Hugging face PEFT library (Supports)
+
+**Big Idea**: Downstream tasks have intrinsically low dimensions: when fine-tuning, we can get away with a lot loess compute, leverages:
+  * bitsandbytes for quanitization
+  * PEFT methods
+
 * LoRA: LORA: LOW-RANK ADAPTATION OF LARGE LANGUAGE MODELS
 * Prefix Tuning: P-Tuning v2: Prompt Tuning Can Be Comparable to Fine-tuning Universally Across Scales and Tasks
 * Prompt Tuning: The Power of Scale for Parameter-Efficient Prompt Tuning
 * P-Tuning: GPT Understands, Too
+* QLoRA is an improvement on LoRA
 
 
 ***
-# openAI API
+# Section 10. New NLP Developments
 ***
 
 ## GPT4
@@ -954,6 +988,34 @@ You are an AI programming assistant.
 - minimize any other prose
 ```
   
+## GPTs (Generative Pre-Trained Transformers)
+
+Build on foundation of:
+
+* unsupervised pre-training
+  * Web pages, reddit
+* Supervised fine-tuning
+  * Benchmarks (class NLP tasks: Q&A, Information Retrival, Sentence completion)
+* More compute + data
+
+## Adapting Large Models (LLMs) to New Tasks
+
+* Zero-shot learning
+  * Prompting
+* Few-shot learning
+  * Prompting with examples
+* Fine-Tuning
+  * Dozens or fewer examples
+  * Change model task schema
+* We are exploring a subspace of LLM for a specific task
+
+## Instruction Tuning & "Fine-Tuning"
+
+* LLM supervised fine-tuning vs Instruction-Tuning
+  * No instruction vs. Following instructions
+  * class benchmarks vs. New benchmarks: (bias, toxicity, etc)
+* GenAI apps fine-tuning
+  * Specific task such as input-output schema, e.g. how a user interacts with app
 
 ***
 # Refenence: 
@@ -977,6 +1039,21 @@ You are an AI programming assistant.
 
 - Building with Instruct-Tuned LLMs, a Step-by-Step Guide: https://github.com/FourthBrain/Building-with-Instruction-Tuned-LLMs-A-Step-by-Step-Guide
 - Supervised Fine-Tuning (Instruct-Tuning) of OpenLLAMA with Dolly15k & QLORA: https://colab.research.google.com/drive/1SRclU2pcgzCkVXpmhKppVbGW4UcCs5xT?usp=sharing
+  * Dolly15k dataset (from databricks)
+    * contains 15000 high-quality human generatd prompt-response pairs
+    * designed for instruction tuning LLMs
+    * Dataset Structure
+      * Instruction
+      * Context
+      * Response
+      * Category
+        * Creative writing
+        * Close QA
+        * Open QA
+        * Summarization
+        * Information Extraction
+        * Classification
+        * BrainsTorming
 - Unsupervised Fine-Tuning (1-O Schema) of BLOOMZ with PEFT-LORA: https://colab.research.google.com/drive/1ARmlaZZaKyAg6HTi57psFLPeh0hDRcPX?usp=sharing
 
 

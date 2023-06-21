@@ -1,6 +1,8 @@
 import numpy as np
 import flair
 import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
+from scipy import distance
 import matplotlib.pyplot as plt
 from typing import Union
 
@@ -12,14 +14,55 @@ def sentiment_flair(text):
     return sentence.get_labels()[0].value, sentence.get_labels()[0].score
 
 
-def cosine_sim(a, b):
-    """_summary_
+def cosine_sim_np(a, b):
+    """ (a.b) / (|a|*|b|)
 
     :param a: numpy array with dimension of (n, )
     :param b: numpy array with dimension of (n, )
     :return: consine_similarity in float
     """
-    return np.matmul(a, b.T)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+
+def cosine_sim_sk(a, b):
+    """ (a.b) / (|a|*|b|)
+
+    :param a: numpy array with dimension of (n, )
+    :param b: numpy array with dimension of (n, )
+    :return: consine_similarity in float
+    """
+    return cosine_similarity(a.reshape(1, -1), b.reshape(1, -1))[0][0]
+
+
+def cosine_dist_np(a, b):
+    """ 1 - (a.b) / (|a|*|b|)
+
+    :param a: numpy array with dimension of (n, )
+    :param b: numpy array with dimension of (n, )
+    :return: consine_similarity in float
+    """
+    return 1 - cosine_sim_np(a, b)
+
+
+def cosine_dist_sk(a, b):
+    """ 1 - (a.b) / (|a|*|b|)
+
+    :param a: numpy array with dimension of (n, )
+    :param b: numpy array with dimension of (n, )
+    :return: consine_similarity in float
+    """
+    return cosine_distances(a.reshape(1, -1), b.reshape(1, -1))[0][0]
+
+
+def cosine_dist_scipy(a, b):
+    """_summary_
+
+    :param a: numpy array with dimension of (n, )
+    :param b: numpy array with dimension of (n, )
+    :return: consine_distance in float
+    """
+    return distance.cosine(a, b)
+
 
 
 class DataExplorer:
