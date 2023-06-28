@@ -35,13 +35,21 @@
   * Attention layers: this layer will tell the model to pay specific attention to certain words in the sentence you passed it (and more or less ignore the others) when dealing with the representation of each word.
     * Note that the first attention layer in a decoder block pays attention to all (past) inputs to the decoder, but the second attention layer uses the output of the encoder. It can thus access the whole input sentence to best predict the current word. This is very useful as different languages can have grammatical rules that put the words in different orders, or some context provided later in the sentence may be helpful to determine the best translation of a given word.
 * Encoder (only) Models:
-  * Good for tasks that require understanding of the input, such as sentence/sequence classification (sentiment analysis) and named entity recognition. (Models: BERT, ALBERT, DistilBERT, ELECTRA, RoBERTa)
+  * Consist of layers: self-attention (multi-headed) and Bi-directional embeddings
+  * Good for tasks that require understanding of the input, such as sentence/sequence classification (sentiment analysis) and named entity recognition. 
+  * popular models: BERT, ALBERT, DistilBERT, ELECTRA, RoBERTa)
   * At each stage, the attention layers can access all the words in the initial sentence. These models are often characterized as having “bi-directional” attention, and are often called auto-encoding models
   * The words numerical representation (e.g. BERT has the size of 768) also consider the context around the word (bi-directional i.e. both left and right)
   * The pretraining of the models usually are: masking random words, Question and answer, reconstricturing intiial sentence, NLU (natural language understanding)
-
-* decoder only model: Good for generative tasks such as text generation.
-* Encoder-decoder models or sequence-to-sequence models: Good for generative tasks that require an input, such as translation or summarization.
+* decoder only model: 
+  * Consist of layers: Auto-regressive, uni-directional, masked self-attention (masked on the right side, hide right context)
+  * Good for generative tasks such as text generation, causal language modeling task, generating sequence
+  * Popular: GPT, GPT-2, GPT-3, CTRL, Transformer XL
+    * GPT-2 has a max left context of 1024 words
+* Encoder-decoder models or sequence-to-sequence models
+  * Good for generative tasks that require an input, such as translation or summarization.
+  * Popular Models: T5, BART, mBART, Marian
+  * Because encoder and decoder does not share weights, we can generate different text length based on tasks
 
 ## GenAI API
 
