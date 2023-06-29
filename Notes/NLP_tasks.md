@@ -157,6 +157,24 @@
     print(decoded_string) # 'Using a Transformer network is simple'
     ```
 
+#### Handle Multiple Sequences
+
+* Transformer model accept multiple sentences by default
+  * Need to add a dimension if run for single sequence
+* A batch is a 2-d tensor consist of multiple padded tokenized ids to maintain the right matrix shape
+* Use attention layer to mask the padded token to ensure model can predict correctly
+* Transformer model can handel sequence of up to 512 or 1024 tokens, we should truncate the sequence to meet the requirement
+  * `sequence = sequence[:max_sequence_length]
+* If we need longer requirement, we should consider models support long form (e.g. Longformer, LED)
+* The above is already there in the tokenizer API when using `AutoTokenizer.from_pretrained()` and `tokenizer(my_sequence)`
+ 
+
+#### [E2E Basic Modeling Code Example](https://colab.research.google.com/github/huggingface/notebooks/blob/master/course/en/chapter2/section6_pt.ipynb)
+
+### Fine-Tuning a Pretrained Model
+
+
+
 
 ## GenAI API
 
