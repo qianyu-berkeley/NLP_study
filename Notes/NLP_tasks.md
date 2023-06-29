@@ -129,9 +129,33 @@
     * vocalbulary is much smaller than word-based
     * much fewer out-of-vocabulary (unknown) tokens
     * Hold less information then word-based, also varies based on different language
-    * We need to use a very large amount of tokens to be processed by our model
+    * We need to use a very large amount of tokens to be processed by our model, i.e. very large sequence (token id numerical representation 
   * sub-word based:
+    * Follow 2 principles:
+      * frequently used words should not be split into smaller subwords
+      * rare (complex) words should be decomposed into meaningful subwords
+    * sub-word tokenization algorithm can identify the start of the words, prefix, subfix
+      * Byte-level BPE, as used in GPT-2
+      * WordPiece, as used in BERT
+      * SentencePiece or Unigram, as used in several multilingual models (XLnet, ALBERT)
 
+    Example: Note that decoder will construct subword to the full word. This behavior will be extremely useful when we use models that predict new text (either text generated from a prompt, or for sequence-to-sequence problems like translation or summarization).
+
+    ```python
+    from transformers import AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
+
+    sequence = "Using a Transformer network is simple"
+    tokens = tokenizer.tokenize(sequence)
+    print(tokens) #['Using', 'a', 'transform', '##er', 'network', 'is', 'simple']
+
+    ids = tokenizer.convert_tokens_to_ids(tokens)
+    print(ids) #[7993, 170, 11303, 1200, 2443, 1110, 3014]
+
+    decoded_string = tokenizer.decode([7993, 170, 11303, 1200, 2443, 1110, 3014])
+    print(decoded_string) # 'Using a Transformer network is simple'
+    ```
 
 
 ## GenAI API
