@@ -118,6 +118,20 @@
     model = BertModel.from_pretrained("bert-base-cased")
     ```
 
+#### Tokenizers
+
+* Tokenizer trade-offs
+  * Goal: find the most meaningfull, efficient representation
+  * Word-based: split words with white space, with extra rules for punctuations
+    * very large vocabulary size
+    * We may have to limit the size of vocabulary and treat the rest as unknown (`[UNK]`) causing lost of information
+  * Character-based
+    * vocalbulary is much smaller than word-based
+    * much fewer out-of-vocabulary (unknown) tokens
+    * Hold less information then word-based, also varies based on different language
+    * We need to use a very large amount of tokens to be processed by our model
+  * sub-word based:
+
 
 
 ## GenAI API
