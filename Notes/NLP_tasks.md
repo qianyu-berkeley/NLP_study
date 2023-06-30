@@ -167,13 +167,21 @@
   * `sequence = sequence[:max_sequence_length]
 * If we need longer requirement, we should consider models support long form (e.g. Longformer, LED)
 * The above is already there in the tokenizer API when using `AutoTokenizer.from_pretrained()` and `tokenizer(my_sequence)`
+
+token_type_ids. In this example, this is what tells the model which part of the input is the first sentence and which is the second sentence.
  
 
 #### [E2E Basic Modeling Code Example](https://colab.research.google.com/github/huggingface/notebooks/blob/master/course/en/chapter2/section6_pt.ipynb)
 
 ### Fine-Tuning a Pretrained Model
 
-
+* Steps:
+  * Preparing large dataset from the hub
+  * Use high-level trainer API
+  * Use a customer training loop
+  * Leverage the accelerated library
+* Processing Large Dataset from the hub
+  * raw dataset format: `DatasetDict()`
 
 
 ## GenAI API
