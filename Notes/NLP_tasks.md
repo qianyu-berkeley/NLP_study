@@ -173,16 +173,33 @@ token_type_ids. In this example, this is what tells the model which part of the 
 
 #### [E2E Basic Modeling Code Example](https://colab.research.google.com/github/huggingface/notebooks/blob/master/course/en/chapter2/section6_pt.ipynb)
 
+
 ### Fine-Tuning a Pretrained Model
 
 * Steps:
   * Preparing large dataset from the hub
+    * download datasets
+    * preprocessing
   * Use high-level trainer API
   * Use a customer training loop
   * Leverage the accelerated library
 * Processing Large Dataset from the hub
   * raw dataset format: `DatasetDict()`
+* ([GLUE](https://openreview.net/pdf?id=rJ4km2R5t7)) benchmark contain 10 dataset to benchmark text classification
+  * Single sentnces (COLA, SST-2)
+  * Pairs of sentences (MRPC, STS-B, QQP, HNLI, QNLI, RTE, WMLI)
+  * This is one way to measure the goodness of fine-tuning
+* Preprocessing dataset 
+  * `AutoTokenizer` accept both one/pair of sentences, or a list single/pair of sentences as inputs
+  * To read pair of sentences, we use `token_type_ids`
+  
+  ```python
+  from transformers import AutoTokenizer
 
+  checkpoint = "bert-base-uncased"
+  tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+  
+  ```
 
 ## GenAI API
 
@@ -190,3 +207,12 @@ token_type_ids. In this example, this is what tells the model which part of the 
 * Few shot prompt
 * retrival-augmented few shot prompt
 * Fine tuning
+
+
+### Prompt engineering resources
+
+https://learn.microsoft.com/en-us/semantic-kernel/prompt-engineering/
+edx.org/course/ai-applications-and-prompt-engineering
+https://www.coursera.org/learn/prompt-engineering
+https://www.promptingguide.ai/
+https://www.promptengineering.org/learn/
