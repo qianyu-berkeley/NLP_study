@@ -183,23 +183,388 @@ token_type_ids. In this example, this is what tells the model which part of the 
   * Use high-level trainer API
   * Use a customer training loop
   * Leverage the accelerated library
+
+* A simple end to end code example (pytorch)
+
+  ```python
+  import torch
+  from transformers import AdamW, AutoTokenizer, AutoModelForSequenceClassification
+
+  # Same as before
+  checkpoint = "bert-base-uncased"
+  tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+  model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
+  sequences = [
+      "I've been waiting for a HuggingFace course my whole life.",
+      "This course is amazing!",
+  ]
+  batch = tokenizer(sequences, padding=True, truncation=True, return_tensors="pt")
+  batch["labels"] = torch.tensor([1, 1])
+  optimizer = AdamW(model.parameters())
+  loss = model(**batch).loss
+  loss.backward()
+  optimizer.step()
+  ```
+
+#### Download and Processing Data
+
 * Processing Large Dataset from the hub
   * raw dataset format: `DatasetDict()`
+  
+  ```python
+  from datasets import load_dataset
+
+  raw_datasets = load_dataset("glue", "mrpc")
+  raw_datasets
+  
+  ## Access DatasetDict
+  raw_train_dataset = raw_datasets["train"]
+  raw_train_dataset[0]
+  ```
+
+  ```python
+  ## output
+  DatasetDict({
+      train: Dataset({
+          features: ['sentence1', 'sentence2', 'label', 'idx'],
+          num_rows: 3668
+      })
+      validation: Dataset({
+          features: ['sentence1', 'sentence2', 'label', 'idx'],
+          num_rows: 408
+      })
+      test: Dataset({
+          features: ['sentence1', 'sentence2', 'label', 'idx'],
+          num_rows: 1725
+      })
+  })
+  ```
+
 * ([GLUE](https://openreview.net/pdf?id=rJ4km2R5t7)) benchmark contain 10 dataset to benchmark text classification
   * Single sentnces (COLA, SST-2)
   * Pairs of sentences (MRPC, STS-B, QQP, HNLI, QNLI, RTE, WMLI)
   * This is one way to measure the goodness of fine-tuning
 * Preprocessing dataset 
+  * Based on the pretrained model and task, we determine the way to tokenize the text data (e.g. as a pair of sentences)
   * `AutoTokenizer` accept both one/pair of sentences, or a list single/pair of sentences as inputs
   * To read pair of sentences, we use `token_type_ids`
-  
+
+* Example1: Read raw text (a pair of sentences), tokenizer of a pretrained model checkpoints can prepare the right data for the model
+  * `[CLS]` (input_id: 101),  `[SEP]` (input_id: 102) special tokens that the tokenizer make the model understand the data is a pair of sentences
+  * In the form of `[CLS] sentence1 [SEP] sentence2 [SEP]`, aligning with `token_type_ids`
+  * In general, we don’t need to worry about whether or not there are `token_type_ids` in your tokenized inputs: as long as you use the same checkpoint for the tokenizer and the model, everything will be fine as the tokenizer knows what to provide to its model.
+  * Different checkpoint, however, may not always return `token_type_ids` due to how it was built during the pretraining
+
   ```python
   from transformers import AutoTokenizer
 
   checkpoint = "bert-base-uncased"
   tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+  inputs = tokenizer("This is the first sentence.", "This is the second one.")
+  inputs
   
+  # We get the ouptut where token_type_ids marks the 1st sentence vs 2nd sentence
+  { 
+    'input_ids': [101, 2023, 2003, 1996, 2034, 6251, 1012, 102, 2023, 2003, 1996, 2117, 2028, 1012, 102],
+    'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+    'attention_mask': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  }
+  
+  # Decode the input_ids and align with token_type_id
+  ['[CLS]', 'this', 'is', 'the', 'first', 'sentence', '.', '[SEP]', 'this', 'is', 'the', 'second', 'one', '.', '[SEP]']
+  [      0,      0,    0,     0,       0,          0,   0,       0,      1,    1,     1,        1,     1,   1,       1]
   ```
+
+* Example 2, next sentence prediction task where the model is provided pairs of sentences (with randomly masked tokens) and asked to predict whether the second sentence follows the first. feeding a batch of pair of sentences (assuming we select the right checkpoint that pretrained with pair of sentences)
+
+  ```python
+  tokenized_dataset = tokenizer(
+    raw_datasets["train"]["sentence1"],
+    raw_datasets["train"]["sentence2"],
+    padding=True,
+    truncation=True,
+  )
+  ```
+  
+  * Limitations of the approach
+    * returning a dictionary (with keys: `input_ids`, `attention_mask`, and `token_type_ids`, and values that are lists of lists).
+    * It will also only work if you have enough RAM to store your whole dataset during the tokenization (whereas the datasets from the 🤗 Datasets library are Apache Arrow files stored on the disk, so you only keep the samples you ask for loaded in memory).
+
+* Example 3 (Better approach), use `Dataset.map()` method, it apply a function on each element of the datasets for any preprocessing task including tokenization
+  * We can use `batched=True` in our call to map()
+  * no padding defined here, discuss in the next example
+  * To enable multiprocessing when applying your preprocessing function with map() by passing along a num_proc argument, this enabled by default with Tokenizers library
+
+  ```python
+  def tokenize_function(examples):
+      return tokenizer(examples["sentence1"], examples["sentence2"], truncation=True)
+
+  tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+  tokenized_datasets
+  
+  # new fields are added to the datasets
+  DatasetDict({
+    train: Dataset({
+        features: ['attention_mask', 'idx', 'input_ids', 'label', 'sentence1', 'sentence2', 'token_type_ids'],
+        num_rows: 3668
+    })
+    validation: Dataset({
+        features: ['attention_mask', 'idx', 'input_ids', 'label', 'sentence1', 'sentence2', 'token_type_ids'],
+        num_rows: 408
+    })
+    test: Dataset({
+        features: ['attention_mask', 'idx', 'input_ids', 'label', 'sentence1', 'sentence2', 'token_type_ids'],
+        num_rows: 1725
+    })
+  })
+  ```
+
+* Example 4. Dynamic Padding
+  * Trade off: using the fixed shaped (always padding to a fixed length) vs dynamic padding where we padd to the max length of the current batch
+  * Fixed length: TPU may prefer fixed shape, can be costly for short sentences, may cut off long sentence.
+  
+    ```python
+    # fixed length
+
+    from datasets import load_datasets
+    from transformers import AutoTokenizer
+
+    raw_datasets = load_dataset("glue", "mrpc")
+    checkpoint = "bert-base-cased"
+    tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+
+    def tokenize_function(examples):
+      return tokenizer(examples["sentence1"], examples["sentence2"], padding="max_length", truncation=True, max_length=128)
+
+    tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+    tokenized_datasets = tokenized_datasets.remove_columns(["idx", "sentence1", "sentence2"])
+    tokenized_datasets = tokenized_datasets.rename_column(["label", "labels"])
+    tokenized_datasets = tokenized_datasets.with_format("torch")
+
+    # We can load fixed torch sized tensor
+    from torch.utils.data import DataLoader
+    train_dataloader = DataLoader(tokenized_datasets["train"], batch_size=16, shuffle=True)
+    ```
+
+  * Dynamic padding: improve training speed
+
+    ```python
+    # fixed length
+
+    from datasets import load_datasets
+    from transformers import AutoTokenizer
+
+    raw_datasets = load_dataset("glue", "mrpc")
+    checkpoint = "bert-base-cased"
+    tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+
+    def tokenize_function(examples):
+      return tokenizer(examples["sentence1"], examples["sentence2"], truncation=True)
+
+    tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+    tokenized_datasets = tokenized_datasets.remove_columns(["idx", "sentence1", "sentence2"])
+    tokenized_datasets = tokenized_datasets.rename_column(["label", "labels"])
+    tokenized_datasets = tokenized_datasets.with_format("torch")
+
+    # dynamic padding
+    ## different torch size
+    from transformers import DataCollatorWithPadding
+
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+    from torch.utils.data import DataLoader
+
+    train_dataloader = DataLoader(tokenized_datasets["train"], batch_size=16, shuffle=True, collate_fn=data_collator)
+    ```
+
+#### Trainer API
+
+* Define a `TrainingArguments` class that will contain all the hyperparameters the Trainer will use for training and evaluation. 
+* The only argument you have to provide is a `directory` where the trained model will be saved, as well as the checkpoints along the way.
+* Define a model (based on tasks and pretrained model), e.g, we use `AutoModelForSequenceClassification` based on our task
+  * Note BERT has not been pretrained on classifying pairs of sentences, so the head of the pretrained model has been discarded and a new head suitable for sequence classification is added instead  
+  * The warnings indicate that some weights were not used (the ones corresponding to the dropped pretraining head) and that some others were randomly initialized (the ones for the new head)
+* Define a trainer and pass the parameter from tokenization step
+  * The default data_collator used by the Trainer will be a DataCollatorWithPadding
+  * Default optimizer for trainer API is AdamW
+  * Default learning rate scheduler is a linear decay from the maximum value (5e-5) to 0
+* `trainer.train() will kick off the fine tuning
+  * It reports the training loss every 500 steps. 
+  * It won’t, however, tell you how well the model is performing unless
+    * We define compute metrics for trainer
+    * We define an evaluation strategy (steps, epoches)
+* Evaluate
+  * All 🤗 Transformers models will return the loss when labels are provided
+
+  ```python
+  from transformers import TrainingArguments
+  from transformers import AutoModelForSequenceClassification
+
+  training_args = TrainingArguments("test-trainer")
+
+  model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
+
+  from transformers import Trainer
+
+  trainer = Trainer(
+      model,
+      training_args,
+      train_dataset=tokenized_datasets["train"],
+      eval_dataset=tokenized_datasets["validation"],
+      data_collator=data_collator, # optional if we pass tokenizer which already use the same data_collator
+      tokenizer=tokenizer,
+  )
+  trainer.train()
+
+  # Evaluate after train
+  predictions = trainer.predict(tokenized_datasets["validation"])
+
+  import numpy as np
+
+  preds = np.argmax(predictions.predictions, axis=-1)
+
+  import evaluate
+
+  metric = evaluate.load("glue", "mrpc")
+  metric.compute(predictions=preds, references=predictions.label_ids)
+  ```
+
+* Have evaluation and train together
+  * Define `evaluation_strategy` for `TrainingArguments()` 
+  * Define `compute_metrics` function for `Trainer`
+
+  ```python
+  def compute_metrics(eval_preds):
+      metric = evaluate.load("glue", "mrpc")
+      logits, labels = eval_preds
+      predictions = np.argmax(logits, axis=-1)
+      return metric.compute(predictions=predictions, references=labels)
+
+  training_args = TrainingArguments("test-trainer", evaluation_strategy="epoch")
+  model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
+
+  trainer = Trainer(
+      model,
+      training_args,
+      train_dataset=tokenized_datasets["train"],
+      eval_dataset=tokenized_datasets["validation"],
+      data_collator=data_collator,
+      tokenizer=tokenizer,
+      compute_metrics=compute_metrics,
+  )
+  ```
+
+#### Full Custom Training Loop (without using Trainer API)
+
+* E2E Training loop with pytorch and leverage hugging face APIs (dataset, tokenizer, evalute)
+
+  ```python
+  # Preparing Data
+  from datasets import load_dataset
+  from transformers import AutoTokenizer, DataCollatorWithPadding
+
+  raw_datasets = load_dataset("glue", "mrpc")
+  checkpoint = "bert-base-uncased"
+  tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+
+
+  def tokenize_function(example):
+      return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
+
+
+  tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+  data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+  # remove columns based on model requirement
+  tokenized_datasets = tokenized_datasets.remove_columns(["sentence1", "sentence2", "idx"])
+  tokenized_datasets = tokenized_datasets.rename_column("label", "labels")
+  tokenized_datasets.set_format("torch")
+  tokenized_datasets["train"].column_names
+  # ["attention_mask", "input_ids", "labels", "token_type_ids"]
+
+  # Using torch dataloader to produce batches 
+  from torch.utils.data import DataLoader
+
+  train_dataloader = DataLoader(
+      tokenized_datasets["train"], shuffle=True, batch_size=8, collate_fn=data_collator
+  )
+  eval_dataloader = DataLoader(
+      tokenized_datasets["validation"], batch_size=8, collate_fn=data_collator
+  )
+
+  for batch in train_dataloader:
+    break
+  {k: v.shape for k, v in batch.items()}
+  #{'attention_mask': torch.Size([8, 65]),
+  # 'input_ids': torch.Size([8, 65]),
+  # 'labels': torch.Size([8]),
+  # 'token_type_ids': torch.Size([8, 65])}
+
+  # load model
+  from transformers import AutoModelForSequenceClassification
+
+  model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
+
+  outputs = model(**batch)
+  print(outputs.loss, outputs.logits.shape)
+  # tensor(0.5441, grad_fn=<NllLossBackward>) torch.Size([8, 2])
+  
+  # define optimizer and lr scheduler and device
+  import torch
+  from transformers import AdamW
+  from transformers import get_scheduler
+
+  optimizer = AdamW(model.parameters(), lr=5e-5)
+  num_epochs = 3
+  num_training_steps = num_epochs * len(train_dataloader)
+  lr_scheduler = get_scheduler(
+      "linear",
+      optimizer=optimizer,
+      num_warmup_steps=0,
+      num_training_steps=num_training_steps,
+  )
+
+  device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+  model.to(device)
+  device
+  # device(type='cuda')
+
+  # Training loop
+  from tqdm.auto import tqdm
+
+  progress_bar = tqdm(range(num_training_steps))
+
+  model.train()
+  for epoch in range(num_epochs):
+      for batch in train_dataloader:
+          batch = {k: v.to(device) for k, v in batch.items()}
+          outputs = model(**batch)
+          loss = outputs.loss
+          loss.backward()
+
+          optimizer.step()
+          lr_scheduler.step()
+          optimizer.zero_grad()
+          progress_bar.update(1)
+
+  # Evaluate
+  import evaluate
+
+  metric = evaluate.load("glue", "mrpc")
+  model.eval()
+  for batch in eval_dataloader:
+      batch = {k: v.to(device) for k, v in batch.items()}
+      with torch.no_grad():
+          outputs = model(**batch)
+
+      logits = outputs.logits
+      predictions = torch.argmax(logits, dim=-1)
+      metric.add_batch(predictions=predictions, references=batch["labels"])
+
+  metric.compute()
+
+  ```
+
 
 ## GenAI API
 
