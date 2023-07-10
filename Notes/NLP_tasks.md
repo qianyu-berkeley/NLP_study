@@ -562,8 +562,45 @@ token_type_ids. In this example, this is what tells the model which part of the 
       metric.add_batch(predictions=predictions, references=batch["labels"])
 
   metric.compute()
-
   ```
+
+### Sharing Models and Tokenizers
+
+#### The hugging Face hub
+
+* Model is hosted as a git repo
+* Model is auto deployed as a hosted inference api
+* Free if public 
+
+#### User pretrained model
+
+* Use pipeline API to run tasks directly
+* Recommend to use `Auto*` classes for loading checkpoints to use model architecture since it is architecture-agnostic
+
+#### Sharing pretrained models
+
+There are three ways to go about creating new model repositories:
+
+* Using the push_to_hub API (Best)
+  * When you call `trainer.train()`, the Trainer will then upload your model to the Hub each time it is saved (here every epoch) in a repository in your namespace
+  * Once your training is finished, you should do a final `trainer.push_to_hub()` to upload the last version of your model. 
+  * It will also generate a model card with all the relevant metadata, reporting the hyperparameters used and the evaluation results
+
+* Using the huggingface_hub Python library
+* Using the web interface
+
+#### Build a model card
+
+* The model card usually starts with a very brief, high-level overview of what the model is for, followed by additional details in the following sections:
+
+  * Model description
+  * Intended uses & limitations
+  * How to use
+  * Limitations and bias
+  * Training data
+  * Training procedure
+  * Evaluation results
+
 
 
 ## GenAI API
