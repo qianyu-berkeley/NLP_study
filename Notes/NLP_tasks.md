@@ -738,8 +738,16 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
   * Using Dataset.map() with batched=True will be essential to unlock the speed of the “fast” tokenizers
 
 
+### Tokenizers Library Indepth
 
+#### Intro
 
+* Goal: train a brand ndew tokenizer on corpus of text in the use case where we want to train a model from scratch without using the same tokenizer as the pretrained model
+* topics:
+  * Train a new toeknizer similar to the one used by a given checkpoint a new corpus of text
+  * Special feature of fast toeknizers
+  * difference between main subword toeknization alogithms
+  * Build a tokenizer from scratch
 
 ## GenAI API
 
