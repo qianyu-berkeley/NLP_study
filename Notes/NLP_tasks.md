@@ -601,6 +601,144 @@ There are three ways to go about creating new model repositories:
   * Training procedure
   * Evaluation results
 
+### Dataset Library Indepth
+
+#### Basic Steps to fine tuning a model
+
+* Load a dataset from hugging Face Hub
+* Preprocessing data with `Dataset.map()`
+* Load and compute metrics
+
+#### Working with local dataset
+
+|data format | loading script | example |
+| ---------- | -------------- | ------- |
+|csv & tsv | csv | `load_dataset("csv", data_files="my_file.csv")` | 
+|json | json | `load_dataset("json", data_files="my_file.json")` | 
+|jsonl | json | `load_dataset("json", data_files="my_file.jsonl")` | 
+|text | text | `load_dataset("text", data_files="my_file.txt")` | 
+|picked dataframe | pandas | `load_dataset("pandas", data_files="my_file.pkl")` | 
+
+* Example:
+
+  ```python
+  from datasets import load_dataset
+
+  # load train data
+  squad_it_dataset = load_dataset("json", data_files="SQuAD_it-train.json", field="data")
+
+  squad_it_dataset
+
+  DatasetDict({
+    train: Dataset({
+        features: ['title', 'paragraphs'],
+        num_rows: 442
+    })
+  })
+  
+  # load both train and test
+  data_files = {"train": "SQuAD_it-train.json", "test": "SQuAD_it-test.json"}
+  squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
+  ```
+* The data_files argument of the load_dataset() function is quite flexible and can be either a single file path, a list of file paths, or a dictionary that maps split names to file paths. You can also glob files that match a specified pattern according to the rules used by the Unix shell (e.g., you can glob all the JSON files in a directory as a single split by setting data_files="*.json")
+* work with compressed files
+
+```python
+data_files = {"train": "SQuAD_it-train.json.gz", "test": "SQuAD_it-test.json.gz"}
+squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
+```
+
+* load remote dataset
+
+```python
+url = "https://github.com/crux82/squad-it/raw/master/"
+data_files = {
+    "train": url + "SQuAD_it-train.json.gz",
+    "test": url + "SQuAD_it-test.json.gz",
+}
+squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
+```
+
+#### Slide and dice dataset
+
+* Example
+  1. Download dataset
+
+  ```bash
+  !wget "https://archive.ics.uci.edu/ml/machine-learning-databases/00462/drugsCom_raw.zip"
+  !unzip drugsCom_raw.zip
+  ```
+  
+  2. load datatset
+
+  ```python
+  from datasets import load_dataset
+
+  data_files = {"train": "drugsComTrain_raw.tsv", "test": "drugsComTest_raw.tsv"}
+  # \t is the tab character in Python
+  drug_dataset = load_dataset("csv", data_files=data_files, delimiter="\t")
+
+  drug_sample = drug_dataset["train"].shuffle(seed=42).select(range(1000))
+  # Peek at the first few examples
+  drug_sample[:3]
+  ```
+  
+  ```bash
+  {'Unnamed: 0': [87571, 178045, 80482],
+  'drugName': ['Naproxen', 'Duloxetine', 'Mobic'],
+  'condition': ['Gout, Acute', 'ibromyalgia', 'Inflammatory Conditions'],
+  'review': ['"like the previous person mention, I&#039;m a strong believer of aleve, it works faster for my gout than the prescription meds I take. No more going to the doctor for refills.....Aleve works!"', '"I have taken Cymbalta for about a year and a half for fibromyalgia pain. It is great\r\nas a pain reducer and an anti-depressant, however, the side effects outweighed \r\nany benefit I got from it. I had trouble with restlessness, being tired constantly,\r\ndizziness, dry mouth, numbness and tingling in my feet, and horrible sweating. I am\r\nbeing weaned off of it now. Went from 60 mg to 30mg and now to 15 mg. I will be\r\noff completely in about a week. The fibro pain is coming back, but I would rather deal with it than the side effects."', '"I have been taking Mobic for over a year with no side effects other than an elevated blood pressure.  I had severe knee and ankle pain which completely went away after taking Mobic.  I attempted to stop the medication however pain returned after a few days."'],
+  'rating': [9.0, 3.0, 10.0],
+  'date': ['September 2, 2015', 'November 7, 2011', 'June 5, 2013'],
+  'usefulCount': [36, 13, 128]}
+  ```
+  
+  3. split, process data
+
+  ```python
+  for split in drug_dataset.keys():
+    assert len(drug_dataset[split]) == len(drug_dataset[split].unique("Unnamed: 0"))
+
+  drug_dataset = drug_dataset.rename_column(
+      original_column_name="Unnamed: 0", new_column_name="patient_id"
+  )
+  drug_dataset
+  ```
+  
+  ```bash
+  DatasetDict({
+    train: Dataset({
+        features: ['patient_id', 'drugName', 'condition', 'review', 'rating', 'date', 'usefulCount'],
+        num_rows: 161297
+    })
+    test: Dataset({
+        features: ['patient_id', 'drugName', 'condition', 'review', 'rating', 'date', 'usefulCount'],
+        num_rows: 53766
+    })
+  })
+  ```
+
+  ```python
+  def lowercase_condition(example):
+    return {"condition": example["condition"].lower()}
+
+  def compute_review_length(example):
+    return {"review_length": len(example["review"].split())}
+
+  drug_dataset = drug_dataset.filter(lambda x: x["condition"] is not None)
+  drug_dataset.map(lowercase_condition) # AttributeError: 'NoneType' object has no attribute 'lower'
+  drug_dataset = drug_dataset.map(compute_review_length)
+  drug_dataset = drug_dataset.filter(lambda x: x["review_length"] > 30)
+  drug_dataset = drug_dataset.map(lambda x: {"review": html.unescape(x["review"])}) # unescape html (&#039;)
+
+  ```  
+
+  * **`map()`** The Dataset.map() method takes a `batched` argument that, if set to True, causes it to send a batch of examples to the map function at once (the batch size is configurable but defaults to 1,000).
+  * When you specify batched=True the function receives a dictionary with the fields of the dataset, but each value is now a list of values, and not just a single value. (need to use list comprehension) The return value of Dataset.map() should be the same.
+  * Using Dataset.map() with batched=True will be essential to unlock the speed of the “fast” tokenizers
+
+
+
 
 
 ## GenAI API
