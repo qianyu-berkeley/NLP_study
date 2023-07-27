@@ -743,11 +743,34 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
 #### Intro
 
 * Goal: train a brand ndew tokenizer on corpus of text in the use case where we want to train a model from scratch without using the same tokenizer as the pretrained model
+  * if a language model is not in your language
+  * if your corpus is very different
 * topics:
   * Train a new toeknizer similar to the one used by a given checkpoint a new corpus of text
   * Special feature of fast toeknizers
   * difference between main subword toeknization alogithms
   * Build a tokenizer from scratch
+
+#### Train a new tokenizer from old
+
+* Most of transformer use subword tokenization algorithm to find the most frequently used subwords in the corpus at hand which require training
+* Training a tokenizer is not the same as training a model which is **stochastic** in natural. Training a tokenizer is statistical process that try to identify which subwords are the best for a given corpus and it is **deterministic**
+* API to use: `AutoTokenizer.train_new_from_iterator()`
+  * Need to transform dataset into an iterator of lists of texts
+  * lists of texts => proces a batch of text at once
+  * use generator as iterator => avoid loading the whole dataset into memory
+  
+    ```python
+    # Generator with comprehension
+    training_corpus = (
+      raw_datasets["train"][i : i + 1000]["whole_func_string"]
+      for i in range(0, len(raw_datasets["train"]), 1000
+    )
+    ```
+  * **Note**: this function only works if the tokenizer you are using is a “fast” tokenizer. (written in rust)
+    * [Transformer supports fast tokenizer](https://huggingface.co/docs/transformers/index#supported-frameworks)
+
+
 
 ## GenAI API
 
