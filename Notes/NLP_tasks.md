@@ -767,9 +767,45 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
       for i in range(0, len(raw_datasets["train"]), 1000
     )
     ```
+
   * **Note**: this function only works if the tokenizer you are using is a “fast” tokenizer. (written in rust)
     * [Transformer supports fast tokenizer](https://huggingface.co/docs/transformers/index#supported-frameworks)
 
+
+#### Special features of fast tokenizers
+
+* Fast tokenizers are written in Rust and wrapped in Python, need to use `batched=True` to enable its speed with parallel processing
+  * paralleization
+  * offset mapping to keep track of orignial span of texts
+* output of toeknizer is a a BatchEncoding object (a sub class of dictionary)
+
+  ```python
+  from transformers import AutoTokenizer
+
+  tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
+  example = "North London is red."
+  encoding = tokenizer(example)
+  tokenizer.is_fast #True
+  encoding.is_fast #True
+  ```
+
+#### A token classification model (NER)
+
+* Approach 1. using `pipeline` api
+
+  ```python
+  from transformers import pipeline
+
+  # without grouping
+  token_classifier = pipeline("token-classification")
+  token_classifier("Arsenal FC is a football club and North London is red.")
+  
+  # with grouping
+  token_classifier = pipeline("token-classification", aggregation_strategy="simple")
+  token_classifier("Arsenal FC is a football club and North London is red.")
+  ```
+
+* Approach 2. custom
 
 
 ## GenAI API
