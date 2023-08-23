@@ -774,10 +774,14 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
 
 #### Special features of fast tokenizers
 
-* Fast tokenizers are written in Rust and wrapped in Python, need to use `batched=True` to enable its speed with parallel processing
+* Fast tokenizers are written in **Rust** and wrapped in Python, we need to use `batched=True` to enable its speed with parallel processing
   * paralleization
   * offset mapping to keep track of orignial span of texts
-* output of toeknizer is a a BatchEncoding object (a sub class of dictionary)
+* output of toeknizer is a a special BatchEncoding object (a sub class of dictionary) to enable methods of fast toeknizers
+* Keep track of the original span of texts using offset mapping, if a token is at the start of a word or if two tokens are in the same word. We could rely on the ## prefix for that, but `#` only works for BERT-like tokenizers. If we use other tokenizer special character changes, fast tokenizer works for all type
+  * Applied use cases: NER, POS, MLM (whole word masking)
+    * word ID => whole word masking, token classification (NER), QA
+    * offset mapping => token classification (NER), QA
 
   ```python
   from transformers import AutoTokenizer
@@ -787,25 +791,125 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
   encoding = tokenizer(example)
   tokenizer.is_fast #True
   encoding.is_fast #True
+  start, end = encoding.word_to_chars(3)
+  example[start:end]
   ```
 
-#### A token classification model (NER)
+#### Token classification pipeline (NER)
 
-* Approach 1. using `pipeline` api
+* Task: the task is to identify which parts of the text correspond to entities like persons, locations, or organizations 
+* using token classification pipeline: same as the text classification pipeline in preprocessing and model steps but more complex in post-processing step
+  * tokenization => preprocessing => model => post processing
+  * Instead of 1 label for the sentence, we getting 1 label for each tokens in the sentence
+* The `aggregation_strategy` will change the score computed for each grouped entity
+  * `simple`: uses the man of the scores of each token in a given entity (i.e. `groupby(entity).mean()``)
+  * `first`: where the score of each entity is the score of the first token of that entity 
+  * `max`: where the score of each entity is the maximum score of the tokens in that entity
+  * `average`, where the score of each entity is the average of the scores of the words composing that entity (note that words and tokens may be different depending on the text)
+* The label `B-XXX` indicates the token is at the beginning of an entity XXX and the label `I-XXX` indicates the token is inside the entity XXX.
+* There are actually two formats for those B- and I- labels: IOB1 and IOB2. The IOB2 format (in pink below), is the one we introduced whereas in the IOB1 format (in blue), the labels beginning with B- are only ever used to separate two adjacent entities of the same type.
+
+* Using pipeline
+
+    ```python
+    from transformers import pipeline
+
+    # without grouping
+    token_classifier = pipeline("token-classification")
+    token_classifier("Arsenal FC is a football club and North London is red.")
+    
+    # with grouping
+    token_classifier = pipeline("token-classification", aggregation_strategy="simple")
+    token_classifier("Arsenal FC is a football club and North London is red.")
+    ```
+
+* without using pipeline
 
   ```python
-  from transformers import pipeline
+  from transformers import AutoTokenizer, AutoModelForTokenClassification
+
+  model_checkpoint = "dbmdz/bert-large-cased-finetuned-conll03-english"
+  tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+  model = AutoModelForTokenClassification.from_pretrained(model_checkpoint)
+
+  example = "My name is Qian and I work at Arsenal in London."
+  inputs = tokenizer(example, return_tensors="pt")
+  outputs = model(**inputs)
+  
+  print(inputs["input_ids"].shape) # torch.Size(1, 19)
+  print(outputs.logits.shape) # torch.Size(1, 19, 9)
+
 
   # without grouping
-  token_classifier = pipeline("token-classification")
-  token_classifier("Arsenal FC is a football club and North London is red.")
+  import torch
+  probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)[0].tolist()
+  predictions = outputs.logits.argmax(dim=-1)[0].tolist()
+
+  results = []
+  inputs_with_offsets = tokenizer(example, return_offsets_mapping=True)
+  tokens = inputs_with_offsets.tokens()
+  offsets = inputs_with_offsets["offset_mapping"]
+
+  for idx, pred in enumerate(predictions):
+      label = model.config.id2label[pred]
+      if label != "O":
+        start, end = offset[idx]
+        results.append(
+              {"entity": label, 
+              "score": probabilities[idx][pred], 
+              "word": tokens[idx],
+              "start": start,
+              "end": end,
+              }
+          )
+
+  print(results)
   
   # with grouping
-  token_classifier = pipeline("token-classification", aggregation_strategy="simple")
-  token_classifier("Arsenal FC is a football club and North London is red.")
+  import numpy as np
+  
+  results = []
+  inputs_with_offsets = tokenizer(example, return_offsets_mapping=True)
+  tokens = inputs_with_offsets.tokens()
+  offsets = inputs_with_offsets["offset_mapping"]
+  
+  idx = 0
+  while idx < len(predictions):
+      pred = predictions[idx]
+      label = model.config.id2label[pred]
+      if label != "O":
+          # Remove the B- or I-
+          label = label[2:]
+          start, _ = offsets[idx]
+  
+          # Grab all the tokens labeled with I-label
+          all_scores = []
+          while (
+              idx < len(predictions)
+              and model.config.id2label[predictions[idx]] == f"I-{label}"
+          ):
+              all_scores.append(probabilities[idx][pred])
+              _, end = offsets[idx]
+              idx += 1
+  
+          # The score is the mean of all the scores of the tokens in that grouped entity
+          score = np.mean(all_scores).item()
+          word = example[start:end]
+          results.append(
+              {
+                  "entity_group": label,
+                  "score": score,
+                  "word": word,
+                  "start": start,
+                  "end": end,
+              }
+          )
+      idx += 1
+  
+  print(results
   ```
 
-* Approach 2. custom
+
 
 
 ## GenAI API
