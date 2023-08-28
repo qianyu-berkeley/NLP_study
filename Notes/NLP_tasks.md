@@ -1,4 +1,4 @@
-# NLP Tasks and APIs
+# NLP Tasks with HuggingFace APIs
 
 ## HuggingFace API
 
@@ -909,7 +909,240 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
   print(results
   ```
 
+#### Fast Tokenizers in QA pipelines
 
+* We can use QA pipeline which has the same step as other pipelines
+* Unlike the other pipelines, which can’t truncate and split texts that are longer than the maximum length accepted by the model (and thus may miss information at the end of a document), this pipeline can deal with very long contexts and will return the answer to the question even if it’s at the end
+* Use a AutoModel to QA task:
+  * we tokenize the question and the context as a pair, with the question first.
+  * Models for question answering work a little differently from other models. The model has been trained to predict the index of the token starting the answer and the index of the token where the answer ends. This is why QA models don’t return one tensor of logits but two: one for the logits corresponding to the start token of the answer, and one for the logits corresponding to the end token of the answer. (i.e. The goal is to find which token has the highest probability to be the first words of the ansers, which token has the highest probability to be the last word of the answer)
+
+    ```python
+    from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+
+    model_checkpoint = "distilbert-base-cased-distilled-squad"
+    tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+    model = AutoModelForQuestionAnswering.from_pretrained(model_checkpoint)
+
+    inputs = tokenizer(question, context, return_tensors="pt")
+    outputs = model(**inputs)
+    
+    start_logits = outputs.start_logits
+    end_logits = outputs.end_logits
+    ```
+
+  * To convert those logits into probabilities, we will apply a softmax function — but before that, we need to make sure we mask the indices that are not part of the context. The input is in `[CLS] question [SEP] context [SEP]`, so we need to mask the tokens of the question as well as the [SEP] token. We’ll keep the [CLS] token, however, as some QA models use it to indicate that the answer is not in the context.
+  * To apply a softmax afterward, we need to replace the logits we want to mask with a large negative number. e.g. use -10000:
+
+    ```python
+    import torch
+    
+    sequence_ids = inputs.sequence_ids()
+    # Mask everything apart from the tokens of the context
+    mask = [i != 1 for i in sequence_ids]
+    # Unmask the [CLS] token
+    mask[0] = False
+
+    # use [None] to do the same a unsqueezing/expanding a tensor axis to match logits tenor shape
+    mask = torch.tensor(mask)[None] 
+    
+    start_logits[mask] = -10000
+    end_logits[mask] = -10000
+    
+    # Apply softmax to get probability, dim=-1, since we apply softmax to the last dim where logit is.
+    # grab index [0] to reduce dimension
+    start_probabilities = torch.nn.functional.softmax(start_logits, dim=-1)[0]
+    end_probabilities = torch.nn.functional.softmax(end_logits, dim=-1)[0]
+    ```
+    
+  * To prevent start index larger than end index from argmax (meaning to avoid first word of the answer behind the last word in the text), We will compute the probabilities of each possible start_index and end_index where start_index <= end_index, then take the tuple (start_index, end_index) with the highest probability.
+    * compute all the products `start_probabilities[start_index]×end_probabilities[end_index]` where start_index <= end_index.
+    * Then we’ll mask the values where start_index > end_index by setting them to 0 (the other probabilities are all positive numbers). The `torch.triu()` function returns the upper triangular part of the 2D tensor passed as an argument, so it will do that masking for us because start_index <= end_index at the upper triangle 
+    * With `argmax()`, PyTorch will return the index in the flattened tensor, we need to use the floor division // and modulus % operations to get the start_index and end_index:
+    
+    ```python
+    scores = start_probabilities[:, None] * end_probabilities[None, :] # (67 x 1) * (1 x 67) = (67 x 67)
+    scores = torch.triu(scores)
+    max_index = scores.argmax().item()
+    start_index = max_index // scores.shape[1] # start_index = 23 
+    end_index = max_index % scores.shape[1] # end_index = 35
+    print(scores[start_index, end_index])
+    ```
+
+  * we just need to convert to the character indices in the context. This is where the offsets will be super useful. We can grab them and use them like we did in the token classification task
+    ```python
+    inputs_with_offsets = tokenizer(question, context, return_offsets_mapping=True)
+    offsets = inputs_with_offsets["offset_mapping"]
+
+    start_char, _ = offsets[start_index]
+    _, end_char = offsets[end_index]
+    answer = context[start_char:end_char]
+    ```
+* Work with Long Context
+  * We’ll need to truncate our inputs at that maximum length. 
+  * We don’t want to truncate the question, only the context. Since the context is the second sentence, we’ll use the "only_second" truncation strategy. 
+  * The problem that arises then is that the answer to the question may not be in the truncated context.
+  *  To fix this, the question-answering pipeline allows us to split the context into smaller chunks, specifying the maximum length. To make sure we don’t split the context at exactly the wrong place to make it possible to find the answer, it also includes some overlap between the chunks.
+    * Use tokenizer with `return_overflowing_tokens=True`
+    * example below show the sentence split into chunks such that entry in the `inpus["input_ids"]` has at most 6 tokens with padding for the last entry, and has overlapping of 2 tokens
+    ```python
+    sentence = "This sentence is not too long but we are going to split it anyway."
+    inputs = tokenizer(
+      sentence, truncation=True, return_overflowing_tokens=True, max_length=6, stride=2
+    )
+    ```
+
+#### Normalization and pre-tokenization
+
+* Before splitting text into subtokens, the tokenizer performs: normalization and pre-tokenization
+
+![tokenization_steps](./imgs/tokenization_steps.png)
+
+* Normalization: step involves general cleanup
+  * removing whitespace, lowercasing, accents
+  * apply unicode normalization (e.g. NFC or NFKC)
+  * To acess underlying tokenizer's `normalizer`'s `normalizer_str()`
+
+    ```python
+    from transformers import AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+    print(tokenizer.backend_tokenizer.normalizer.normalize_str("Héllò hôw are ü?"))
+    ```
+    * Different pretrained model's tokenizer perform normalization differently, it is recommenced to choose for the data
+
+* Pre-tokenization
+  * split text into small entities
+  * keep track of the offset
+  * Different model perform pre-tokenization differently
+    * some will ignore multiple space replace with one
+    * some will replace a specifc token such as `_`
+
+* SentencePieces: A tokenization algorithm for preprocessing text
+  * [Reference](https://github.com/google/sentencepiece)
+  * SentencePiece is an unsupervised text tokenizer and detokenizer mainly for Neural Network-based text generation systems where the vocabulary size is predetermined prior to the neural model training
+  * It considers the text as a sequence of Unicode characters, and replaces spaces with a special character, ▁. 
+  * Used in conjunction with the Unigram algorithm
+  * it doesn’t even require a pre-tokenization step, which is very useful for languages where the space character is not used (like Chinese or Japanese).
+  * The other main feature of SentencePiece is **reversible tokenization**: since there is no special treatment of spaces, decoding the tokens is done simply by concatenating them and replacing the _s with spaces — this results in the normalized text
+    * e.g. BERT Tokenizer removes repeating spaces, so its tokenization is not reversible
+
+#### Subword Tokenization algorithms
+* 3 main algorithms:
+  * BPE
+  * WordPieces
+  * Unigram
+
+| Model	| BPE	| WordPiece	| Unigram |
+| --- | --- | --- | --- |
+| Training	| Starts from a small vocabulary and learns rules to merge tokens	| Starts from a small vocabulary and learns rules to merge tokens	| Starts from a large vocabulary and learns rules to remove tokens |
+| Training step	| Merges the tokens corresponding to the most common pair	| Merges the tokens corresponding to the pair with the best score based on the frequency of the pair, privileging pairs where each individual token is less frequent| Removes all the tokens in the vocabulary that will minimize the loss computed on the whole corpus | 
+| Learns	| Merge rules and a vocabulary	| Just a vocabulary | 	A vocabulary with a score for each token |
+| Encoding	| Splits a word into characters and applies the merges learned during training | Finds the longest subword starting from the beginning that is in the vocabulary, then does the same for the rest of the word	| Finds the most likely split into tokens, using the scores learned during training | 
+
+* BPE (Byte-Pair Encoding Tokenization)
+  * Byte-Pair Encoding (BPE) was initially developed as an algorithm to compress texts, and then used by OpenAI for tokenization when pretraining the GPT model
+  * It is used by GPT, GTP-2, RoBerta, BART, and DeBERTa
+      * If an example you are tokenizing uses a character that is not in the training corpus, that character will be converted to the unknown token, which would cause model to be poor analyizing text with e.g. emojis
+      * The GPT-2 and RoBERTa tokenizers (which are pretty similar) have a clever way to deal with this: they don’t look at words as being written with Unicode characters, but with bytes. 
+  * Training Steps: 
+    1. Normalization
+    2. Pre-tokenization
+    3. Splitting the words into individual characters
+       * computing the unique set of words used in the corpus (after the normalization and pre-tokenization steps are completed
+       * building the vocabulary by taking all the symbols used to write those words. For real-world cases, that base vocabulary will contain all the ASCII characters, at the very least, and probably some Unicode characters as well
+    4. Applying the merge rules learned in order on those splits
+      *  add new tokens until the desired vocabulary size is reached by learning merges, which are rules to merge two elements of the existing vocabulary together into a new one
+      
+    ```python
+    from collections import defaultdict
+    from transformers import AutoTokenizer
+
+    corpus = ["text1", "text2", "text3", ...]
+    word_freqs = defaultdict(int)
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+
+    # Train BPE
+    # 1. pre-tokenization and compute word frequence
+    for text in corpus:
+        words_with_offsets = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+        new_words = [word for word, offset in words_with_offsets]
+        for word in new_words:
+            word_freqs[word] += 1
+
+    # 2. compute vocabulary, get alphabet, create word and its splits dictionary
+    alphabet = []
+
+    for word in word_freqs.keys():
+        for letter in word:
+            if letter not in alphabet:
+                alphabet.append(letter)
+    alphabet.sort()
+    vocab = ["<|endoftext|>"] + alphabet.copy()
+    splits = {word: [c for c in word] for word in word_freqs.keys()}
+    
+    def compute_pair_freqs(splits):
+      """Compute frequency of each pair"""
+
+      pair_freqs = defaultdict(int)
+      for word, freq in word_freqs.items():
+          split = splits[word]
+          if len(split) == 1:
+              continue
+          for i in range(len(split) - 1):
+              pair = (split[i], split[i + 1])
+              pair_freqs[pair] += freq
+      return pair_freqs
+    
+    def merge_pair(a, b, splits):
+      """apply merge in splits dictionary"""
+      for word in word_freqs:
+          split = splits[word]
+          if len(split) == 1:
+              continue
+
+          i = 0
+          while i < len(split) - 1:
+              if split[i] == a and split[i + 1] == b:
+                  split = split[:i] + [a + b] + split[i + 2 :]
+              else:
+                  i += 1
+          splits[word] = split
+      return splits
+
+    # 3. learn all the merges to get to the vocab size.
+    vocab_size = 50
+
+    while len(vocab) < vocab_size:
+      pair_freqs = compute_pair_freqs(splits)
+      best_pair = ""
+      max_freq = None
+      for pair, freq in pair_freqs.items():
+          if max_freq is None or max_freq < freq:
+              best_pair = pair
+              max_freq = freq
+      splits = merge_pair(*best_pair, splits)
+      merges[best_pair] = best_pair[0] + best_pair[1]
+      vocab.append(best_pair[0] + best_pair[1])
+    
+    def tokenize(text):
+      """A function to apply BPE to new text after trained merges"""
+      pre_tokenize_result = tokenizer._tokenizer.pre_tokenizer.pre_tokenize_str(text)
+      pre_tokenized_text = [word for word, offset in pre_tokenize_result]
+      splits = [[l for l in word] for word in pre_tokenized_text]
+      for pair, merge in merges.items():
+          for idx, split in enumerate(splits):
+              i = 0
+              while i < len(split) - 1:
+                  if split[i] == pair[0] and split[i + 1] == pair[1]:
+                      split = split[:i] + [merge] + split[i + 2 :]
+                  else:
+                      i += 1
+              splits[idx] = split
+
+      return sum(splits, [])
+    tokenize("new_text")
+    ```
 
 
 ## GenAI API
