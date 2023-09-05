@@ -1053,96 +1053,32 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
        * building the vocabulary by taking all the symbols used to write those words. For real-world cases, that base vocabulary will contain all the ASCII characters, at the very least, and probably some Unicode characters as well
     4. Applying the merge rules learned in order on those splits
       *  add new tokens until the desired vocabulary size is reached by learning merges, which are rules to merge two elements of the existing vocabulary together into a new one
+
+* WordPieces Tokenization
+  * Algorithm google developed to pretrain BERT, also used in DistilBERT, MobileBERT, Funnel Transformers, and MPNET
+  * Training is similar to BPE
+    * Start from small vocab including special tokens
+    * split to subwords and add prefix `##` (e.g. "word" => "w ##o ##r ##d" where `##` prefix indicate character inside a word)
+    * to add vocab, it learn to merge by using 
+      $$score = \frac{freq\ of\ pair}{(freq\ of\ first\ element)\times(freq\ of\ 2nd\ element)}$$
       
-    ```python
-    from collections import defaultdict
-    from transformers import AutoTokenizer
+      the algorithm (how score is calculated) prioritizes the merging of pairs where the individual parts are less frequent in the vocabulary
 
-    corpus = ["text1", "text2", "text3", ...]
-    word_freqs = defaultdict(int)
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    * repeat until reach vocab size
+    * **Note**: Using `train_new_from_iterator()` on the same corpus won’t result in the exact same vocabulary. This is because the 🤗 Tokenizers library does not implement WordPiece for the training (since we are not completely sure of its internals), but uses BPE instead.
 
-    # Train BPE
-    # 1. pre-tokenization and compute word frequence
-    for text in corpus:
-        words_with_offsets = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-        new_words = [word for word, offset in words_with_offsets]
-        for word in new_words:
-            word_freqs[word] += 1
-
-    # 2. compute vocabulary, get alphabet, create word and its splits dictionary
-    alphabet = []
-
-    for word in word_freqs.keys():
-        for letter in word:
-            if letter not in alphabet:
-                alphabet.append(letter)
-    alphabet.sort()
-    vocab = ["<|endoftext|>"] + alphabet.copy()
-    splits = {word: [c for c in word] for word in word_freqs.keys()}
-    
-    def compute_pair_freqs(splits):
-      """Compute frequency of each pair"""
-
-      pair_freqs = defaultdict(int)
-      for word, freq in word_freqs.items():
-          split = splits[word]
-          if len(split) == 1:
-              continue
-          for i in range(len(split) - 1):
-              pair = (split[i], split[i + 1])
-              pair_freqs[pair] += freq
-      return pair_freqs
-    
-    def merge_pair(a, b, splits):
-      """apply merge in splits dictionary"""
-      for word in word_freqs:
-          split = splits[word]
-          if len(split) == 1:
-              continue
-
-          i = 0
-          while i < len(split) - 1:
-              if split[i] == a and split[i + 1] == b:
-                  split = split[:i] + [a + b] + split[i + 2 :]
-              else:
-                  i += 1
-          splits[word] = split
-      return splits
-
-    # 3. learn all the merges to get to the vocab size.
-    vocab_size = 50
-
-    while len(vocab) < vocab_size:
-      pair_freqs = compute_pair_freqs(splits)
-      best_pair = ""
-      max_freq = None
-      for pair, freq in pair_freqs.items():
-          if max_freq is None or max_freq < freq:
-              best_pair = pair
-              max_freq = freq
-      splits = merge_pair(*best_pair, splits)
-      merges[best_pair] = best_pair[0] + best_pair[1]
-      vocab.append(best_pair[0] + best_pair[1])
-    
-    def tokenize(text):
-      """A function to apply BPE to new text after trained merges"""
-      pre_tokenize_result = tokenizer._tokenizer.pre_tokenizer.pre_tokenize_str(text)
-      pre_tokenized_text = [word for word, offset in pre_tokenize_result]
-      splits = [[l for l in word] for word in pre_tokenized_text]
-      for pair, merge in merges.items():
-          for idx, split in enumerate(splits):
-              i = 0
-              while i < len(split) - 1:
-                  if split[i] == pair[0] and split[i + 1] == pair[1]:
-                      split = split[:i] + [merge] + split[i + 2 :]
-                  else:
-                      i += 1
-              splits[idx] = split
-
-      return sum(splits, [])
-    tokenize("new_text")
-    ```
+* Unigram Tokenization
+  * Often used in SentencePiece, used by ALBERT, T5, mBART, Big Bird and XLNet
+  * Opposite of BPE and WordPieces: starts from a big vocabulary and removes tokens from it until it reaches the desired vocabulary size
+  * general steps:
+    * Start with base vocabulary by take most common substrings in pre-tokenized word
+    * At each step of training, computes a loss over the corpus given the current vocabulary. Then, for each symbol in the vocabulary, the algorithm computes how much the overall loss would increase if the symbol was removed, and looks for the symbols that would increase it the least. (i.e. the least impactful), and remove
+    * Tune a parameter to get (10-20%) symbols associated with the lower loss, to reach the desir vocab site
+  * Algorthms: `Unigram` model
+    * considers each token to be independent of the tokens before it, i.e. the probability of token X given the previous context is just the probability of token X.
+    * if we used a Unigram language model to generate text, we would always predict the most common token
+    * In general, tokenizations with the least tokens possible will have the highest probability (because unigram has the same demonimantors for each token), corresponds to our intuition that splitting word into the least number of tokens possible
+    * Use `Viterbi algorithm`. Essentially, we can build a graph to detect the possible segmentations of a given word by saying there is a branch from character a to character b if the subword from a to b is in the vocabulary, and attribute to that branch the probability of the subword. To find the path in that graph that is going to have the best score the Viterbi algorithm determines, for each position in the word, the segmentation with the best score that ends at that position.
 
 
 ## GenAI API
