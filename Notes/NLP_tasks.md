@@ -1081,6 +1081,18 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
     * Use `Viterbi algorithm`. Essentially, we can build a graph to detect the possible segmentations of a given word by saying there is a branch from character a to character b if the subword from a to b is in the vocabulary, and attribute to that branch the probability of the subword. To find the path in that graph that is going to have the best score the Viterbi algorithm determines, for each position in the word, the segmentation with the best score that ends at that position.
 
 
+### Main NLP Tasks
+
+#### Token Classificiation
+
+* Problem to solve: attributing a label to each token in a sentence
+  * NER:  Find the entities (such as persons, locations, or organizations) in a sentence. This can be formulated as attributing a label to each token by having one class per entity and one class for “no entity.”
+  * POS: Mark each word in a sentence as corresponding to a particular part of speech (such as noun, verb, adjective, etc.).
+  * Chunking: Find the tokens that belong to the same entity. This task (which can be combined with POS or NER) can be formulated as attributing one label (usually B-) to any tokens that are at the beginning of a chunk, another label (usually I-) to tokens that are inside a chunk, and a third label (usually O) to tokens that don’t belong to any chunk.
+* [Reference Notebook]()
+
+
+
 ## GenAI API
 
 * Zero shot prompt
