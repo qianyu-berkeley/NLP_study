@@ -1089,10 +1089,64 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
   * NER:  Find the entities (such as persons, locations, or organizations) in a sentence. This can be formulated as attributing a label to each token by having one class per entity and one class for “no entity.”
   * POS: Mark each word in a sentence as corresponding to a particular part of speech (such as noun, verb, adjective, etc.).
   * Chunking: Find the tokens that belong to the same entity. This task (which can be combined with POS or NER) can be formulated as attributing one label (usually B-) to any tokens that are at the beginning of a chunk, another label (usually I-) to tokens that are inside a chunk, and a third label (usually O) to tokens that don’t belong to any chunk.
-* [Reference Notebook]()
+* [Reference Notebook](https://github.com/qianyu-berkeley/NLP_study/blob/main/nlp_tasks/Token_classification_NER_(PyTorch).ipynb)
 
 ### Fine-tuning Masked Lauguage Model (MLM)
 
+* For fine-tune hugging face models for a NLP task, if the corpus used for pretraining is not too different from the corpus used for fine-tuning, transfer learning will usually produce good results.
+* There are a few cases where you’ll want to first fine-tune the **language models** on your data, before training a **task-specific** head. For example, if your dataset contains legal contracts or scientific articles, a vanilla Transformer model like BERT will typically treat the domain-specific words in your corpus as rare tokens, and the resulting performance may be less than satisfactory.
+* Fine-tuning the language model on in-domain data you can boost the performance of many downstream tasks
+* **Domain Adaptation**: fine-tuning a pretrained language model on in-domain data 
+  * use case: take a pretrained language on wikitext => fine-tune language model with IMDB corpus => use for IMDB text classifiction 
+* [Reference Notebook](https://github.com/qianyu-berkeley/NLP_study/blob/main/nlp_tasks/Fine_tuning_a_masked_language_model_(PyTorch).ipynb)
+
+### Translation
+* sequence to sequence task (close to summerization task)
+* Other sequence to sequence tasks are:
+  * **Style transfer**: Creating a model that translates texts written in a certain style to another (e.g., formal to casual or Shakespearean English to modern English)
+  * **Generative question answering**: Creating a model that generates answers to questions, given a context
+* With big enought corpus of text iin 2 language, we can train a new translation model from scratch
+* Fine-tune an existing translation model (e.g. mT5, mBART) is much faster
+* **Domain Adaptation**: fine-tuning a pretrained language model on in-domain data 
+  * use case: take a pretrained language on translation => fine-tune language model with KDE4 dataset => the translation improves so it can completely translate technology terminology to French
+  * cannot use the same tokenizing step for both languages, need to use `text_target` parameter
+    * `tokenizer(en_sentence, text_target=fr_sentence)`
+* `**BLEU score**` metric
+  * from 0 - 100, higher the better
+  * Metric for translation task ([reference](https://en.wikipedia.org/wiki/BLEU))
+  * The BLEU score (a single numerical score) evaluates how close the translations are to their labels (reference translation). It does not measure the intelligibility or grammatical correctness of the model’s generated outputs, but uses statistical rules to ensure that all the words in the generated outputs also appear in the targets. 
+  * compare ngrams of translation to ngrams of references (ngram precision with adjustment)
+  * BlEU score take geometric means of all 4 ngrams precisions 
+  * $BLEU4 \sim \sqrt[4]{p_1 \cdot p_2 \cdot p_3 \cdot p_4}$
+
+
+### Text Summarization
+
+* One of most challenging NLP tasks requiring range abilities
+  * understanding long passages
+  * generate coherent text
+  * captures main topic
+* Similar to machine translation task (translate into shorter version)
+  * most transformer based summarization model adopt the encoder-decoder architecture
+  * GPT family model is unique which also be used for summarization in few-shot settings
+  
+|transformer model | description    | multilingual |
+| ---------------- | -------------- | ------------ |
+| GPT-2 | Although trained as an auto-regressive language model, you can make GPT-2 generate summaries by appending “TL;DR” at the end of the input text | no |
+| pegasus | Uses a pretraining objective to predict masked sentences in multi-sentence texts. This pretraining objective is closer to summarization than vanilla language modeling and scores highly on popular benchmarks. | no |
+| T5 | A universal Transformer architecture that formulates all tasks in a text-to-text framework; e.g., the input format for the model to summarize a document is summarize: ARTICLE. | no |
+| mT5|  A multilingual version of T5, pretrained on the multilingual Common Crawl corpus (mC4), covering 101 languages. | yes |
+| BART| A novel Transformer architecture with both an encoder and a decoder stack trained to reconstruct corrupted input that combines the pretraining schemes of BERT and GPT-2. | no |
+|mBART-50| A multilingual version of BART, pretrained on 50 languages. | yes |
+
+* We use `ROUGE` score as summarization metric
+
+
+
+### NLP Resources/Notes
+
+* https://github.com/nlp-with-transformers/notebooks
+* In the early stages of your NLP projects, a good practice is to train a class of “small” models on a small sample of data. This allows you to debug and iterate faster toward an end-to-end workflow. 
 
 
 ## GenAI API
