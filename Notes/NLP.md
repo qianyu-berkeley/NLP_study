@@ -2,7 +2,31 @@
 
 ***
 
-# Section 1. NLP History and Current
+# Section 1. NLP History, Genernal Concepts
+
+***
+
+## Text Representation
+
+* Term Document Matrix: each words in doc is treated as a dimension, compute similarity as cosine of angle between vectors
+  * Bag of words (BOG)
+  * tf-idf (term frequency inverse document frequency)
+* Word Embeddings: Represent words in a way to bridge context i.e. similar words should have similar representation
+  * Map words to vectors (called embeddings)
+  * learn (train) embedding from context
+  * Solve sparsity problems
+  * Mathematically equivalent to one-hot word vectors (look-up or matrix multiplication): word in sparse vector, look-up the embedding space
+  * Related words appear nearby in embedding space
+  * Find Words simiarity (Semantic) cosine similarity or distance
+
+Similarity Metrics:
+* $\text{dot product: }\overrightarrow{w}_{1} \cdot\overrightarrow{w}_{2}  = \sum_i w_{1i}*w_{2i} => \text{But this score is unnormalized}$
+
+* $\text{cosine similarity is the normalize dot product by vector length: }\cos \theta = \frac{\overrightarrow{w}_{1} \cdot\overrightarrow{w}_{2} }{\|\overrightarrow{w}_{1}\| \|\overrightarrow{w}_{2}\|} => \text{Score may violate triangle inequality rule} $
+
+* $\text{cosine distance = 1 - cosine similarity}$ 
+
+* $\text{if we convert to angular distance: }\theta = \arccos \frac{\overrightarrow{w}_{1} \cdot\overrightarrow{w}_{2} }{\|\overrightarrow{w}_{1}\| \|\overrightarrow{w}_{2}\|} => \text{Solves the triangle inequality}$
 
 ***
 
@@ -10,9 +34,18 @@
 ## Word2Vec
 
 * NLP Started with `word2vec` by Mikolov et al (https://arxiv.org/abs/1301.3781)
+  * Unsurpervised learning: word representation should predict their context and vice versa
+    * **Hypothesis**: let’s try to learn meaning of words (as vector representation), by predicting the words around them.
   * Typical vector dimension is 50 - 100
-  * Method 1: `CBOW` (Continous bag of words): given the surrounding words context we predict the current words
-  * Method 2: `SKIP-gram`: given the words we predict the surrounding words context
+  * Method 1: **`CBOW`** (Continous bag of words): given the surrounding words context we predict the current words
+    * Predicts a word given its context $P(word|context)$. 
+    * Averages vectors for context words
+    * Current word predicted using avg context representation 
+    * maximizes $P(word | avg(context))$
+  * Method 2: **`SKIP-gram`**: given the words we predict the surrounding words context
+    * Predict context around a word $P(context | word)$
+    * Randomly samples X words from context window
+    * Maximizes $P(context_{i\in{X}}|word_i)$
   * Applications:
     * Word similarity in the vector space
     * Document classification
@@ -34,6 +67,13 @@
   
   * A success in this task is getting very close results when caclulating distances (cosine) between matching pairs.
   * Doc2vec was tested in the article on 2 tasks: the first is sentiment analysis, and the second one is similar to the analogical reasoning
+  * Common semi unsupervised methods for word embeddings
+    * Word2vec
+    * Glove
+    * FastText
+    * ELMO 
+    * BERT, 
+    * GPT-2, etc.
 
 *** 
 
@@ -817,7 +857,7 @@ There are 2 types:
 
 * BERT embeddings
   * BERT and many other transformer models are able to take text, and encode a significant amount of information into vectors which represent that text. This means that semantically similar sentences, will be represented by similar vectors.
-  * For BERT base, this will be a vector containing 768. Those 768 values contain our numerical representation of a single token - which we can use as contextual word embeddings.
+  * For BERT base, this will be a vector containing 768 dimension. Those 768 values contain our numerical representation of a single token - which we can use as contextual word embeddings.
   * The simplest and most commonly extracted tensor is the last_hidden_state tensor - which is conveniently output by the BERT model. This is a pretty large tensor - at 512x768 - and we want a vector to apply our similarity measures to it. To do this, we need to convert our last_hidden_states tensor to a vector of 768 dimensions.
   * After create dense vectors embeddings, we need to perform a mean pooling operation on them to create a single vector encoding (the sentence embedding). To do this mean pooling operation we will need to multiply each value in our embeddings tensor by it's respective attention_mask value - so that we ignore non-real tokens.
   

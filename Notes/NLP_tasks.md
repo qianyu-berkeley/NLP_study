@@ -181,7 +181,7 @@ token_type_ids. In this example, this is what tells the model which part of the 
     * download datasets
     * preprocessing
   * Use high-level trainer API
-  * Use a customer training loop
+  * Or Use a customer training loop
   * Leverage the accelerated library
 
 * A simple end to end code example (pytorch)
@@ -982,7 +982,7 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
   * We’ll need to truncate our inputs at that maximum length. 
   * We don’t want to truncate the question, only the context. Since the context is the second sentence, we’ll use the "only_second" truncation strategy. 
   * The problem that arises then is that the answer to the question may not be in the truncated context.
-  *  To fix this, the question-answering pipeline allows us to split the context into smaller chunks, specifying the maximum length. To make sure we don’t split the context at exactly the wrong place to make it possible to find the answer, it also includes some overlap between the chunks.
+  * To fix this, the question-answering pipeline allows us to split the context into smaller chunks, specifying the maximum length. To make sure we don’t split the context at exactly the wrong place to make it possible to find the answer, it also includes some overlap between the chunks.
     * Use tokenizer with `return_overflowing_tokens=True`
     * example below show the sentence split into chunks such that entry in the `inpus["input_ids"]` has at most 6 tokens with padding for the last entry, and has overlapping of 2 tokens
     ```python
@@ -1083,6 +1083,13 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
 
 ### Main NLP Tasks
 
+* Typically we perform transfer learning by reusing the weights from pretraining for pretrained model and fine-tuning them for new use case. This is effective for transformer models
+  * **TBA** Which layers to unfreeze for what type of tasks? or what type of use cases?
+  
+* We can also train a complete new model if we have a lot of data which are different from the pretraining data for the available pretrained models.
+  * Require a lot of compute resources
+  * e.g very unique data: musical notes, molecular sequence (DNA), programming languages
+
 #### Token Classificiation
 
 * Problem to solve: attributing a label to each token in a sentence
@@ -1141,9 +1148,56 @@ squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
 
 * We use `ROUGE` score as summarization metric
 
+* `ROUGE` stands for Recall-Oriented Understudy for Gisting Evaluation
+* compare a generated summary against a set of reference summaries that are typically created by humans
+* based on computing the precision and recall scores for the overlap.
+    * `recall` measures how much of the reference summary is captured by the generated one
+
+$$ Recall= \frac{Total\ number\ of\ words\ in\ reference\ summary}{ Number\ of\ overlapping\ words} $$​
+    * `precision` measures how much of the generated summary was relevant:
+$$ Precision = \frac{Total\ number\ of\ words\ in\ generated\ summary}{ Number\ of\ overlapping\ words} $$
+
+Note: for `sequence-to-sequence` tasks we keep all the weights of the network. Compare this to `text classification` models, where the head of the pretrained model was replaced with a randomly initialized network.
+
+### Training a causal language model (a.k.a autoregressive model) from scratch
+
+* The task is to predicting the next word in a sentence
+* Depending on the goal of the model, we determine the length of the context, e.g. if the goal is to enable code completion of a functio definition, we can use smaller context length, if we want to complete a whole class, we would need larger context window
+* As we increase the context size (or if you have a corpus of short documents), the fraction of chunks that are thrown away will also grow. A more efficient way to prepare the data is to join all the tokenized samples in a batch with an `eos_token_id` token in between, and then perform the chunking on the concatenated sequences.
+* To train a language model from scratch:
+  * Load config using `AutoConfig.from_pretrained(model)` to load pretrained configuration but with new vocab size and bos/eos token ids.
+  * load a new model (without using `from_pretrained()` function) and apply the config
+  * Use the `DataCollatorForLanguageModeling` collator 
+    * it stacking and padding batches
+    * it also takes care of creating the language model labels — in causal language modeling the inputs serve as labels too (just shifted by one element), and this data collator creates them on the fly during training 
+    * By default, it is for MLM (masked language model), we can make `mlm=False` for causal language model
 
 
-### NLP Resources/Notes
+### Question Answering Task
+
+* The task of extracting answer from document
+* The model is trained with questions and their context as input, and answers (extrated or generated)
+* The task has many flavors:
+  * extractive queston answering
+    * Metric: Exact Match, F1-score
+  * Dataset: `SQuAD` dataset which contains question, context and answer
+* Use case: Automating Answering FAQ
+* Encoding only models such as BERT tend to be great at extracting answers to factoid questions but poor when given open-ended questions
+* Encoder-decoder modelsi such as T5 and BART are typically used to syhthesize the information siliar to summeriation for open-ended questions
+
+### Summary
+
+**Key knowledge to gain:**
+
+* Know which architectures (encoder, decoder, or encoder-decoder) are best suited for each task
+* Understand the difference between pretraining and fine-tuning a language model
+* Know how to train Transformer models using either the Trainer API and distributed training features of 🤗 Accelerate or TensorFlow and Keras, depending on which track you’ve been following
+* Understand the meaning and limitations of metrics like ROUGE and BLEU for text generation tasks
+* Know how to interact with your fine-tuned models, both on the Hub and using the pipeline from 🤗 Transformers
+
+
+
+## NLP Resources/Notes
 
 * https://github.com/nlp-with-transformers/notebooks
 * In the early stages of your NLP projects, a good practice is to train a class of “small” models on a small sample of data. This allows you to debug and iterate faster toward an end-to-end workflow. 
